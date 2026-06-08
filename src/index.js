@@ -17,7 +17,7 @@ app.use(cors({
 app.use(express.json());
 
 // Servir imágenes subidas (carpeta uploads/)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads/eventos')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 //Registro de todas las rutas
 app.use('/api/auth', require('./routes/auth.routes'));

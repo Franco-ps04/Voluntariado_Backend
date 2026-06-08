@@ -286,6 +286,63 @@ router.get('/', async (req, res) => {
   }
 });
 
+
+// GET /api/eventos/gestion
+// Panel de administración: admin ve todos; organizador ve solo sus eventos
+router.get('/gestion', auth, soloRoles('admin', 'organizador'), async (req, res) => {
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+
+    let extraWhere = '';
+    if (req.usuario.rol === 'organizador') {
+      const org = await getOrganizadorByUsuarioId(pool, req.usuario.id);
+      if (!org) {
+        return res.json([]);
+      }
+      request.input('idOrg', sql.Int, org.id_organizador);
+      extraWhere = 'WHERE e.id_organizador = @idOrg';
+    }
+
+    const result = await request.query(`
+      SELECT
+        e.id_evento,
+        e.nombre,
+        e.descripcion,
+        CONVERT(VARCHAR(10), e.fecha, 23) AS fecha,
+        CONVERT(VARCHAR(8), e.hora, 108) AS hora,
+        e.ubicacion,
+        e.capacidad,
+        e.inscritos,
+        e.estado,
+        e.latitud,
+        e.longitud,
+        e.imagen_url,
+        t.nombre AS tipo,
+        u.nombre AS organizador,
+        u.id_usuario AS id_usuario_organizador,
+        o.nombre_organizacion AS organizacion,
+        e.id_organizador
+      FROM Evento e
+      INNER JOIN TipoEvento t ON e.id_tipo = t.id_tipo
+      INNER JOIN Organizador o ON e.id_organizador = o.id_organizador
+      INNER JOIN Usuario u ON o.id_usuario = u.id_usuario
+      ${extraWhere}
+      ORDER BY e.fecha DESC, e.hora DESC, e.id_evento DESC
+    `);
+
+    const data = [];
+    for (const ev of result.recordset) {
+      const requisitos = await getRequisitosByEvento(pool, ev.id_evento);
+      data.push({ ...ev, requisitos });
+    }
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // IMPORTANTE: esta ruta debe ir ANTES de /:id
 router.get('/organizadores/lista', auth, soloRoles('admin'), async (req, res) => {
   try {
