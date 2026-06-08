@@ -1,0 +1,5 @@
+node_modules/
+.env
+uploads/
+genera_hash.js
+package-lock.json
