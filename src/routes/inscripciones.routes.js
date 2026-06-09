@@ -20,6 +20,8 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
           e.latitud, e.longitud, e.imagen_url,
           t.nombre   AS tipo,
           u.nombre   AS organizador,
+          u.id_usuario AS id_usuario_organizador,
+          u.email AS email_organizador,
           a.asistio
         FROM Inscripcion i
         JOIN Evento      e ON i.id_evento    = e.id_evento
@@ -112,38 +114,33 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
                         SET estado = N'Próximo'
                         WHERE id_inscripcion = @idIns`);
 
+            // Reiniciar la asistencia para una nueva inscripción
+            await pool.request()
+                .input('idIns', sql.Int, row.id_inscripcion)
+                .query(`DELETE FROM Asistencia
+                        WHERE id_inscripcion = @idIns`);
+
             newId = row.id_inscripcion;
         } else {
-            // Insertar inscripción sin OUTPUT para evitar conflicto con triggers habilitados
-            await pool.request()
+            // Insert compatible con triggers habilitados en la tabla Inscripcion
+            const inserted = await pool.request()
                 .input('idVol', sql.Int, req.usuario.id)
                 .input('idEv', sql.Int, idEvento)
-                .query(`INSERT INTO Inscripcion (id_voluntario, id_evento)
-                        VALUES (@idVol, @idEv)`);
+                .query(`
+                    DECLARE @Ids TABLE (id_inscripcion INT);
+                    INSERT INTO Inscripcion (id_voluntario, id_evento)
+                    OUTPUT INSERTED.id_inscripcion INTO @Ids
+                    VALUES (@idVol, @idEv);
 
-            const inserted = await pool.request()
-                .query('SELECT SCOPE_IDENTITY() AS id_inscripcion');
+                    SELECT TOP 1 id_inscripcion
+                    FROM @Ids;
+                `);
 
             newId = inserted.recordset[0]?.id_inscripcion ?? null;
         }
 
         if (!newId) {
             return res.status(500).json({ message: 'No se pudo registrar la inscripción' });
-        }
-
-        // Crear o reactivar registro de asistencia pendiente
-        const asistencia = await pool.request()
-            .input('idIns', sql.Int, newId)
-            .query('SELECT id_asistencia FROM Asistencia WHERE id_inscripcion = @idIns');
-
-        if (!asistencia.recordset[0]) {
-            await pool.request()
-                .input('idIns', sql.Int, newId)
-                .query('INSERT INTO Asistencia (id_inscripcion, asistio) VALUES (@idIns, 0)');
-        } else {
-            await pool.request()
-                .input('idIns', sql.Int, newId)
-                .query('UPDATE Asistencia SET asistio = 0 WHERE id_inscripcion = @idIns');
         }
 
         res.status(201).json({ id: newId, message: 'Inscripción realizada correctamente' });
