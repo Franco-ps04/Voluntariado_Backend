@@ -3,7 +3,7 @@ const { sql, getPool } = require('../database/db');
 const auth = require('../middlewares/auth');
 const soloRoles = require('../middlewares/roles');
 
-// ── GET /api/notificaciones/mis ────────────────────────────
+// GET /api/notificaciones/mis
 // Anuncios de los eventos donde el voluntario está inscrito
 router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
     try {
@@ -15,6 +15,7 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
           n.id_notificacion, n.titulo, n.mensaje,
           CONVERT(VARCHAR, n.fecha, 120) AS fecha,
           e.nombre  AS evento,
+          e.estado  AS estado_evento,
           u.nombre  AS enviado_por,
           CASE WHEN nl.id_notificacion IS NOT NULL THEN 1 ELSE 0 END AS leida
         FROM Notificacion n
@@ -34,7 +35,7 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
     }
 });
 
-// ── PATCH /api/notificaciones/:id/leida ───────────────────
+// PATCH /api/notificaciones/:id/leida
 // Voluntario marca un anuncio como leído
 router.patch('/:id/leida', auth, soloRoles('voluntario'), async (req, res) => {
     try {
@@ -57,7 +58,7 @@ router.patch('/:id/leida', auth, soloRoles('voluntario'), async (req, res) => {
     }
 });
 
-// ── POST /api/notificaciones ───────────────────────────────
+// POST /api/notificaciones
 // Admin u organizador crea un anuncio para un evento
 // Body: { idEvento, titulo, mensaje }
 router.post('/', auth, soloRoles('admin', 'organizador'), async (req, res) => {

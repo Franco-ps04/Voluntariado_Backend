@@ -9,12 +9,12 @@ const config = {
     password: process.env.DB_PASSWORD,
     port: parseInt(process.env.DB_PORT || '1433'),
     options: {
-        encrypt: false,  // true si usas Azure
-        trustServerCertificate: true,  // true para desarrollo local
+        encrypt: false,
+        trustServerCertificate: true,
     }
 };
 
-//Reutiliza conexiones en vez de abrir una nueva por cada queryreutiliza conexiones en vez de abrir una nueva por cada query
+//Reutiliza conexiones en vez de abrir una nueva por cada query
 let pool;
 
 async function getPool() {

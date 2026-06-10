@@ -39,7 +39,7 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'Error interno del servidor' });
 });
 
-// ── Arrancar servidor ──────────────────────────────────────
+//Arrancar servidor
 const PORT = process.env.PORT || 3000;
 getPool()
     .then(() => {

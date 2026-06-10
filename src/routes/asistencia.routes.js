@@ -42,7 +42,7 @@ async function emitirCertificadosSiCorresponde(pool, idVoluntario) {
     }
 }
 
-// ── GET /api/asistencia/:eventoId ─────────────────────────
+// GET /api/asistencia/:eventoId
 // Lista de voluntarios + estado de asistencia de un evento
 router.get('/:eventoId', auth, soloRoles('admin', 'organizador'), async (req, res) => {
     try {
@@ -69,7 +69,7 @@ router.get('/:eventoId', auth, soloRoles('admin', 'organizador'), async (req, re
     }
 });
 
-// ── PUT /api/asistencia/:inscripcionId ─────────────────────
+// PUT /api/asistencia/:inscripcionId
 // Registrar o actualizar asistencia de un voluntario
 // Body: { asistio: true | false }
 // El TRIGGER TR_Asistencia_Certificado emitirá certificados

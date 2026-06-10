@@ -3,7 +3,7 @@ const { sql, getPool } = require('../database/db');
 const auth = require('../middlewares/auth');
 const soloRoles = require('../middlewares/roles');
 
-// ── GET /api/certificados/mis ──────────────────────────────
+// GET /api/certificados/mis
 // Certificados del voluntario autenticado
 router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
   try {
@@ -26,7 +26,7 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
   }
 });
 
-// ── GET /api/certificados ──────────────────────────────────
+// GET /api/certificados
 // Todos los certificados (panel admin)
 router.get('/', auth, soloRoles('admin'), async (req, res) => {
   try {
@@ -48,7 +48,7 @@ router.get('/', auth, soloRoles('admin'), async (req, res) => {
   }
 });
 
-// ── POST /api/certificados/verificar/:idVoluntario ─────────
+// POST /api/certificados/verificar/:idVoluntario
 // Verificar y emitir certificados pendientes manualmente.
 // Normalmente el TRIGGER lo hace automático, pero este endpoint
 // es útil si necesitas forzar la verificación desde el panel.

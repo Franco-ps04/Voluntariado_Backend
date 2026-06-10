@@ -37,7 +37,7 @@ async function upsertOrganizador(pool, idUsuario, nombreOrganizacion) {
   }
 }
 
-// ── GET /api/usuarios ──────────────────────────────────────
+// GET /api/usuarios
 // Lista completa de usuarios (solo admin)
 // Query params: ?rol=voluntario&buscar=juan
 router.get('/', auth, soloRoles('admin'), async (req, res) => {
@@ -75,7 +75,33 @@ router.get('/', auth, soloRoles('admin'), async (req, res) => {
   }
 });
 
-// ── GET /api/usuarios/:id ──────────────────────────────────
+// GET /api/usuarios/destinatarios-activos
+// Destinatarios activos para consultas/mensajes (solo admin)
+router.get('/destinatarios-activos', auth, soloRoles('voluntario'), async (req, res) => {
+  try {
+    const pool = await getPool();
+    const result = await pool.request()
+      .query(`
+        SELECT
+          u.id_usuario,
+          u.nombre,
+          u.email,
+          u.rol,
+          o.nombre_organizacion
+        FROM Usuario u
+        LEFT JOIN Organizador o ON o.id_usuario = u.id_usuario
+        WHERE u.activo = 1
+          AND u.rol = 'admin'
+        ORDER BY u.nombre ASC
+      `);
+
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+//GET /api/usuarios/:id
 router.get('/:id', auth, soloRoles('admin'), async (req, res) => {
   try {
     const pool = await getPool();
@@ -96,7 +122,7 @@ router.get('/:id', auth, soloRoles('admin'), async (req, res) => {
   }
 });
 
-// ── PUT /api/usuarios/:id ──────────────────────────────────
+// PUT /api/usuarios/:id
 // Editar datos de un usuario (sin campo distrito)
 // Body: { nombre, email, telefono, rol }
 router.put('/:id', auth, soloRoles('admin'), async (req, res) => {
@@ -114,6 +140,14 @@ router.put('/:id', auth, soloRoles('admin'), async (req, res) => {
 
   try {
     const pool = await getPool();
+
+    const current = await pool.request()
+      .input('id', sql.Int, req.params.id)
+      .query('SELECT rol FROM Usuario WHERE id_usuario = @id');
+
+    const rolAnterior = current.recordset[0]?.rol ?? null;
+    const promovido = (rolAnterior === 'voluntario' && (rol === 'admin' || rol === 'organizador'));
+
     await pool.request()
       .input('id', sql.Int, req.params.id)
       .input('nombre', sql.NVarChar, nombre)
@@ -133,13 +167,27 @@ router.put('/:id', auth, soloRoles('admin'), async (req, res) => {
         .query('DELETE FROM Organizador WHERE id_usuario = @idU');
     }
 
+    if (promovido) {
+      await pool.request()
+        .input('idU', sql.Int, req.params.id)
+        .query(`
+          UPDATE Inscripcion
+          SET estado = N'Cancelado'
+          WHERE id_voluntario = @idU AND estado <> N'Cancelado'
+        `);
+
+      await pool.request()
+        .input('idU', sql.Int, req.params.id)
+        .query('DELETE FROM Asistencia WHERE id_inscripcion IN (SELECT id_inscripcion FROM Inscripcion WHERE id_voluntario = @idU)');
+    }
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// ── PATCH /api/usuarios/:id/estado ────────────────────────
+// PATCH /api/usuarios/:id/estado
 // Activar o suspender un usuario
 // Body: { activo: true | false }
 router.patch('/:id/estado', auth, soloRoles('admin'), async (req, res) => {
@@ -158,7 +206,7 @@ router.patch('/:id/estado', auth, soloRoles('admin'), async (req, res) => {
   }
 });
 
-// ── PATCH /api/usuarios/mi-perfil ─────────────────────────
+//PATCH /api/usuarios/mi-perfil
 // El propio voluntario edita su perfil (nombre, telefono)
 router.patch('/mi-perfil', auth, async (req, res) => {
   const { nombre, telefono } = req.body;
@@ -170,32 +218,6 @@ router.patch('/mi-perfil', auth, async (req, res) => {
       .input('telefono', sql.NVarChar, telefono)
       .query('UPDATE Usuario SET nombre = @nombre, telefono = @telefono WHERE id_usuario = @id');
     res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// ── GET /api/usuarios/destinatarios-activos ───────────────
-// Destinatarios activos para consultas/mensajes (admin y organizador)
-router.get('/destinatarios-activos', auth, soloRoles('voluntario'), async (req, res) => {
-  try {
-    const pool = await getPool();
-    const result = await pool.request()
-      .query(`
-        SELECT
-          u.id_usuario,
-          u.nombre,
-          u.email,
-          u.rol,
-          o.nombre_organizacion
-        FROM Usuario u
-        LEFT JOIN Organizador o ON o.id_usuario = u.id_usuario
-        WHERE u.activo = 1
-          AND u.rol IN ('admin', 'organizador')
-        ORDER BY CASE WHEN u.rol = 'admin' THEN 0 ELSE 1 END, u.nombre ASC
-      `);
-
-    res.json(result.recordset);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

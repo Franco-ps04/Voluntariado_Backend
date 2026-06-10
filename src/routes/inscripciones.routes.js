@@ -3,7 +3,7 @@ const { sql, getPool } = require('../database/db');
 const auth = require('../middlewares/auth');
 const soloRoles = require('../middlewares/roles');
 
-// ── GET /api/inscripciones/mis ─────────────────────────────
+// GET /api/inscripciones/mis
 // Inscripciones del voluntario autenticado, con datos de asistencia
 router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
     try {
@@ -38,7 +38,7 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
     }
 });
 
-// ── GET /api/inscripciones?eventoId= ──────────────────────
+// GET /api/inscripciones?eventoId
 // Inscritos de un evento (panel admin/org)
 router.get('/', auth, soloRoles('admin', 'organizador'), async (req, res) => {
     const { eventoId } = req.query;
@@ -67,7 +67,7 @@ router.get('/', auth, soloRoles('admin', 'organizador'), async (req, res) => {
     }
 });
 
-// ── POST /api/inscripciones ────────────────────────────────
+// POST /api/inscripciones
 // Voluntario se inscribe a un evento
 // Body: { idEvento }
 router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
@@ -149,7 +149,7 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
     }
 });
 
-// ── PATCH /api/inscripciones/:id/cancelar ─────────────────
+// PATCH /api/inscripciones/:id/cancelar
 // Voluntario anula su propia inscripción
 router.patch('/:id/cancelar', auth, soloRoles('voluntario'), async (req, res) => {
     try {

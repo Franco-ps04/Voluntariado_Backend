@@ -71,8 +71,8 @@ router.get('/destinatarios', auth, soloRoles('voluntario'), async (req, res) => 
           u.rol
         FROM Usuario u
         WHERE u.activo = 1
-          AND u.rol IN ('admin', 'organizador')
-        ORDER BY CASE WHEN u.rol = 'admin' THEN 0 ELSE 1 END, u.nombre ASC
+          AND u.rol = 'admin'
+        ORDER BY u.nombre ASC
       `);
 
     res.json(result.recordset);
@@ -166,13 +166,17 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
       .input('idDest', sql.Int, destino)
       .input('idEvt', sql.Int, idEvento ? Number(idEvento) : null)
       .query(`
+        DECLARE @Ids TABLE (id_mensaje INT);
+
         INSERT INTO Mensaje (
           asunto, mensaje, id_voluntario, id_usuario_destino, id_evento
         )
-        OUTPUT INSERTED.id_mensaje
+        OUTPUT INSERTED.id_mensaje INTO @Ids
         VALUES (
           @asunto, @mensaje, @idVol, @idDest, @idEvt
-        )
+        );
+
+        SELECT TOP 1 id_mensaje FROM @Ids;
       `);
 
     res.status(201).json({

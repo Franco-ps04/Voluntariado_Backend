@@ -143,6 +143,26 @@ async function getEventoById(pool, idEvento) {
   return evento;
 }
 
+async function registrarCambioEstadoEvento(pool, idEvento, estado, idUsuario) {
+  const evento = await getEventoById(pool, idEvento);
+  if (!evento) return;
+
+  const titulo = estado === 'Cancelado' ? 'Evento cancelado' : 'Evento finalizado';
+  const mensaje = estado === 'Cancelado'
+    ? `El evento "${evento.nombre}" fue cancelado.`
+    : `El evento "${evento.nombre}" fue finalizado.`;
+
+  await pool.request()
+    .input('titulo', sql.NVarChar(150), titulo)
+    .input('mensaje', sql.NVarChar(sql.MAX), mensaje)
+    .input('idUser', sql.Int, idUsuario)
+    .input('idEvento', sql.Int, idEvento)
+    .query(`
+      INSERT INTO Notificacion (titulo, mensaje, id_usuario, id_evento)
+      VALUES (@titulo, @mensaje, @idUser, @idEvento)
+    `);
+}
+
 async function resolveEventPayload(req, pool, existingEvento = null) {
   const {
     nombre,
@@ -246,6 +266,8 @@ router.get('/', async (req, res) => {
     if (req.query.estado) {
       where.push('e.estado = @estado');
       request.input('estado', sql.NVarChar, req.query.estado);
+    } else {
+      where.push("e.estado IN ('Próximo', 'En curso')");
     }
 
     const result = await request.query(`
@@ -574,10 +596,16 @@ router.patch('/:id/estado', auth, soloRoles('admin', 'organizador'), async (req,
       }
     }
 
-    await pool.request()
-      .input('estado', sql.NVarChar(13), req.body.estado)
-      .input('id', sql.Int, req.params.id)
-      .query('UPDATE Evento SET estado = @estado WHERE id_evento = @id');
+    if (evento.estado !== req.body.estado) {
+      await pool.request()
+        .input('estado', sql.NVarChar(13), req.body.estado)
+        .input('id', sql.Int, req.params.id)
+        .query('UPDATE Evento SET estado = @estado WHERE id_evento = @id');
+
+      if (req.body.estado === 'Cancelado' || req.body.estado === 'Finalizado') {
+        await registrarCambioEstadoEvento(pool, Number(req.params.id), req.body.estado, req.usuario.id);
+      }
+    }
 
     res.json({ ok: true });
   } catch (err) {
@@ -586,6 +614,7 @@ router.patch('/:id/estado', auth, soloRoles('admin', 'organizador'), async (req,
 });
 
 // DELETE /api/eventos/:id
+// Se usa como cancelación/archivo para conservar historial de inscripciones y certificados
 router.delete('/:id', auth, soloRoles('admin', 'organizador'), async (req, res) => {
   try {
     const pool = await getPool();
@@ -602,25 +631,16 @@ router.delete('/:id', auth, soloRoles('admin', 'organizador'), async (req, res) 
       }
     }
 
-    const idEvento = Number(req.params.id);
+    if (evento.estado !== 'Cancelado') {
+      await pool.request()
+        .input('estado', sql.NVarChar(13), 'Cancelado')
+        .input('id', sql.Int, Number(req.params.id))
+        .query('UPDATE Evento SET estado = @estado WHERE id_evento = @id');
 
-    await pool.request()
-      .input('id', sql.Int, idEvento)
-      .query('DELETE FROM Notificacion WHERE id_evento = @id');
+      await registrarCambioEstadoEvento(pool, Number(req.params.id), 'Cancelado', req.usuario.id);
+    }
 
-    await pool.request()
-      .input('id', sql.Int, idEvento)
-      .query('DELETE FROM Inscripcion WHERE id_evento = @id');
-
-    await pool.request()
-      .input('id', sql.Int, idEvento)
-      .query('DELETE FROM EventoRequisito WHERE id_evento = @id');
-
-    await pool.request()
-      .input('id', sql.Int, idEvento)
-      .query('DELETE FROM Evento WHERE id_evento = @id');
-
-    res.json({ ok: true });
+    res.json({ ok: true, estado: 'Cancelado' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
