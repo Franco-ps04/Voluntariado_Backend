@@ -4,10 +4,10 @@ const auth = require('../middlewares/auth');
 const soloRoles = require('../middlewares/roles');
 
 router.get('/resumen', auth, soloRoles('admin', 'organizador'), async (req, res) => {
-    try {
-        const pool = await getPool();
+  try {
+    const pool = await getPool();
 
-        const eventos = await pool.request().query(`
+    const eventos = await pool.request().query(`
       SELECT
         e.id_evento,
         e.nombre,
@@ -42,7 +42,7 @@ router.get('/resumen', auth, soloRoles('admin', 'organizador'), async (req, res)
       ORDER BY e.fecha DESC, e.hora DESC, e.id_evento DESC
     `);
 
-        const voluntarios = await pool.request().query(`
+    const voluntarios = await pool.request().query(`
       SELECT TOP 10
         u.id_usuario,
         u.nombre,
@@ -55,23 +55,23 @@ router.get('/resumen', auth, soloRoles('admin', 'organizador'), async (req, res)
       ORDER BY COUNT(i.id_inscripcion) DESC, u.nombre ASC
     `);
 
-        const totalEventos = eventos.recordset.length;
-        const totalInscritos = eventos.recordset.reduce((s, e) => s + Number(e.inscritos ?? 0), 0);
-        const totalAsistieron = eventos.recordset.reduce((s, e) => s + Number(e.asistieron ?? 0), 0);
-        const pctAsistencia = totalInscritos > 0 ? Math.round((totalAsistieron / totalInscritos) * 100) : 0;
+    const totalEventos = eventos.recordset.length;
+    const totalInscritos = eventos.recordset.reduce((s, e) => s + Number(e.inscritos ?? 0), 0);
+    const totalAsistieron = eventos.recordset.reduce((s, e) => s + Number(e.asistieron ?? 0), 0);
+    const pctAsistencia = totalInscritos > 0 ? Math.round((totalAsistieron / totalInscritos) * 100) : 0;
 
-        res.json({
-            resumen: {
-                totalEventos,
-                totalInscritos,
-                pctAsistencia
-            },
-            eventos: eventos.recordset,
-            voluntarios: voluntarios.recordset
-        });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
+    res.json({
+      resumen: {
+        totalEventos,
+        totalInscritos,
+        pctAsistencia
+      },
+      eventos: eventos.recordset,
+      voluntarios: voluntarios.recordset
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 module.exports = router;

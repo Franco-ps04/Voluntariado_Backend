@@ -3,6 +3,15 @@ const { sql, getPool } = require('../database/db');
 const auth = require('../middlewares/auth');
 const soloRoles = require('../middlewares/roles');
 
+function estadoKey(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+
 async function getHistorial(pool, idMensaje) {
   const result = await pool.request()
     .input('idMensaje', sql.Int, idMensaje)
@@ -135,9 +144,20 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
   } = req.body;
 
   const destino = Number(idUsuarioDestino || idDestinatario);
+  const asuntoLimpio = String(asunto ?? '').trim();
+  const mensajeLimpio = String(mensaje ?? '').trim();
+  const idEvt = idEvento === undefined || idEvento === null || String(idEvento).trim() === ''
+    ? null
+    : Number(idEvento);
 
-  if (!destino || !asunto || !mensaje) {
+  if (!destino || !asuntoLimpio || !mensajeLimpio) {
     return res.status(400).json({ message: 'Faltan campos obligatorios' });
+  }
+  if (asuntoLimpio.length > 150) {
+    return res.status(400).json({ message: 'El asunto no debe superar 150 caracteres' });
+  }
+  if (mensajeLimpio.length > 5000) {
+    return res.status(400).json({ message: 'El mensaje es demasiado largo' });
   }
 
   try {
@@ -159,12 +179,44 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
       });
     }
 
+    if (idEvt) {
+      const evento = await pool.request()
+        .input('idEvt', sql.Int, idEvt)
+        .query(`
+          SELECT
+            e.id_evento,
+            e.estado,
+            o.id_usuario AS id_usuario_organizador
+          FROM Evento e
+          INNER JOIN Organizador o ON e.id_organizador = o.id_organizador
+          WHERE e.id_evento = @idEvt
+        `);
+
+      if (!evento.recordset[0]) {
+        return res.status(404).json({ message: 'El evento no existe' });
+      }
+
+      const estado = estadoKey(evento.recordset[0].estado);
+      if (estado === 'finalizado' || estado === 'cancelado') {
+        return res.status(400).json({
+          message: 'Solo puedes enviar mensajes mientras el evento esté activo'
+        });
+      }
+
+      if (destinoOk.recordset[0].rol === 'organizador' &&
+          Number(destinoOk.recordset[0].id_usuario) !== Number(evento.recordset[0].id_usuario_organizador)) {
+        return res.status(400).json({
+          message: 'El organizador seleccionado no corresponde al evento'
+        });
+      }
+    }
+
     const insert = await pool.request()
-      .input('asunto', sql.NVarChar(150), asunto)
-      .input('mensaje', sql.NVarChar(sql.MAX), mensaje)
+      .input('asunto', sql.NVarChar(150), asuntoLimpio)
+      .input('mensaje', sql.NVarChar(sql.MAX), mensajeLimpio)
       .input('idVol', sql.Int, req.usuario.id)
       .input('idDest', sql.Int, destino)
-      .input('idEvt', sql.Int, idEvento ? Number(idEvento) : null)
+      .input('idEvt', sql.Int, idEvt)
       .query(`
         DECLARE @Ids TABLE (id_mensaje INT);
 

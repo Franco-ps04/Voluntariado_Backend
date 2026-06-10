@@ -3,6 +3,22 @@ const { sql, getPool } = require('../database/db');
 const auth = require('../middlewares/auth');
 const soloRoles = require('../middlewares/roles');
 
+function estadoKey(value) {
+    return String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+function conteoPalabras(texto) {
+    return String(texto ?? '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .length;
+}
+
 // GET /api/notificaciones/mis
 // Anuncios de los eventos donde el voluntario está inscrito
 router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
@@ -63,16 +79,48 @@ router.patch('/:id/leida', auth, soloRoles('voluntario'), async (req, res) => {
 // Body: { idEvento, titulo, mensaje }
 router.post('/', auth, soloRoles('admin', 'organizador'), async (req, res) => {
     const { idEvento, titulo, mensaje } = req.body;
-    if (!idEvento || !titulo || !mensaje)
+    const idEvt = Number(idEvento);
+    const tituloLimpio = String(titulo ?? '').trim();
+    const mensajeLimpio = String(mensaje ?? '').trim();
+
+    if (!Number.isFinite(idEvt) || idEvt < 1) {
+        return res.status(400).json({ message: 'Selecciona un evento válido' });
+    }
+    if (!tituloLimpio || !mensajeLimpio) {
         return res.status(400).json({ message: 'Faltan campos obligatorios' });
+    }
+    if (tituloLimpio.length > 150) {
+        return res.status(400).json({ message: 'El título no debe superar 150 caracteres' });
+    }
+    if (conteoPalabras(mensajeLimpio) > 500) {
+        return res.status(400).json({ message: 'El mensaje no debe superar 500 palabras' });
+    }
 
     try {
         const pool = await getPool();
+
+        const evento = await pool.request()
+            .input('idEvt', sql.Int, idEvt)
+            .query(`
+              SELECT e.id_evento, e.estado
+              FROM Evento e
+              WHERE e.id_evento = @idEvt
+            `);
+
+        if (!evento.recordset[0]) {
+            return res.status(404).json({ message: 'El evento no existe' });
+        }
+
+        const estado = estadoKey(evento.recordset[0].estado);
+        if (estado === 'finalizado' || estado === 'cancelado') {
+            return res.status(400).json({ message: 'Solo puedes enviar notificaciones a eventos activos' });
+        }
+
         const ins = await pool.request()
-            .input('titulo', sql.NVarChar, titulo)
-            .input('mensaje', sql.NVarChar, mensaje)
+            .input('titulo', sql.NVarChar(150), tituloLimpio)
+            .input('mensaje', sql.NVarChar(sql.MAX), mensajeLimpio)
             .input('idUser', sql.Int, req.usuario.id)
-            .input('idEvento', sql.Int, idEvento)
+            .input('idEvento', sql.Int, idEvt)
             .query(`INSERT INTO Notificacion (titulo, mensaje, id_usuario, id_evento)
               VALUES (@titulo, @mensaje, @idUser, @idEvento)
               SELECT CAST(SCOPE_IDENTITY() AS INT) AS id_notificacion;`);

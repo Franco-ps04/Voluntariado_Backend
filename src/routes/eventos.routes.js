@@ -107,6 +107,29 @@ async function getOrganizadorByUsuarioId(pool, idUsuario) {
   return result.recordset[0] || null;
 }
 
+async function ensureAdminOrganizer(pool, idUsuario) {
+  const existing = await getOrganizadorByUsuarioId(pool, idUsuario);
+  if (existing) return existing;
+
+  const inserted = await pool.request()
+    .input('idU', sql.Int, idUsuario)
+    .input('org', sql.NVarChar(100), 'Administrador')
+    .query(`
+      DECLARE @Ids TABLE (id_organizador INT);
+
+      INSERT INTO Organizador (id_usuario, nombre_organizacion)
+      OUTPUT INSERTED.id_organizador INTO @Ids
+      VALUES (@idU, @org);
+
+      SELECT TOP 1 id_organizador FROM @Ids;
+    `);
+
+  return {
+    id_organizador: inserted.recordset[0].id_organizador,
+    nombre_organizacion: 'Administrador'
+  };
+}
+
 async function getEventoById(pool, idEvento) {
   const result = await pool.request()
     .input('id', sql.Int, idEvento)
@@ -202,17 +225,21 @@ async function resolveEventPayload(req, pool, existingEvento = null) {
     const org = await getOrganizadorByUsuarioId(pool, req.usuario.id);
     idOrgReal = org?.id_organizador || null;
   } else if (req.usuario.rol === 'admin') {
-    idOrgReal = Number(idOrganizador) > 0 ? Number(idOrganizador) : null;
-    if (!idOrgReal) {
-      return { error: 'Debes enviar idOrganizador válido' };
-    }
+    const idOrgDesdeBody = Number(idOrganizador);
+    if (Number.isFinite(idOrgDesdeBody) && idOrgDesdeBody > 0) {
+      const orgExiste = await pool.request()
+        .input('idOrg', sql.Int, idOrgDesdeBody)
+        .query('SELECT id_organizador FROM Organizador WHERE id_organizador = @idOrg');
 
-    const orgExiste = await pool.request()
-      .input('idOrg', sql.Int, idOrgReal)
-      .query('SELECT id_organizador FROM Organizador WHERE id_organizador = @idOrg');
-
-    if (!orgExiste.recordset.length) {
-      return { error: 'El organizador seleccionado no existe' };
+      if (!orgExiste.recordset.length) {
+        return { error: 'El organizador seleccionado no existe' };
+      }
+      idOrgReal = idOrgDesdeBody;
+    } else if (existingEvento?.id_organizador) {
+      idOrgReal = Number(existingEvento.id_organizador);
+    } else {
+      const orgAdmin = await ensureAdminOrganizer(pool, req.usuario.id);
+      idOrgReal = Number(orgAdmin.id_organizador);
     }
   }
 
@@ -220,7 +247,7 @@ async function resolveEventPayload(req, pool, existingEvento = null) {
     return {
       error: req.usuario.rol === 'organizador'
         ? 'No se encontró el organizador asociado a tu cuenta'
-        : 'Debes enviar idOrganizador válido'
+        : 'No se pudo determinar el organizador del evento'
     };
   }
 
