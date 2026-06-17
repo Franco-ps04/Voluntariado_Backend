@@ -524,9 +524,8 @@ router.put(
         return res.status(404).json({ message: 'Evento no encontrado' });
       }
 
-      if (req.usuario.rol === 'organizador') {
-        const org = await getOrganizadorByUsuarioId(pool, req.usuario.id);
-        if (!org || Number(eventoActual.id_organizador) !== Number(org.id_organizador)) {
+      if (req.usuario.rol === 'organizador' || req.usuario.rol === 'admin') {
+        if (Number(eventoActual.id_usuario_organizador) !== Number(req.usuario.id)) {
           return res.status(403).json({ message: 'Sin permisos suficientes' });
         }
       }
@@ -618,9 +617,8 @@ router.patch('/:id/estado', auth, soloRoles('admin', 'organizador'), async (req,
       return res.status(404).json({ message: 'Evento no encontrado' });
     }
 
-    if (req.usuario.rol === 'organizador') {
-      const org = await getOrganizadorByUsuarioId(pool, req.usuario.id);
-      if (!org || Number(evento.id_organizador) !== Number(org.id_organizador)) {
+    if (req.usuario.rol === 'organizador' || req.usuario.rol === 'admin') {
+      if (Number(evento.id_usuario_organizador) !== Number(req.usuario.id)) {
         return res.status(403).json({ message: 'Sin permisos suficientes' });
       }
     }
@@ -654,8 +652,7 @@ router.delete('/:id', auth, soloRoles('admin', 'organizador'), async (req, res) 
     }
 
     if (req.usuario.rol === 'organizador') {
-      const org = await getOrganizadorByUsuarioId(pool, req.usuario.id);
-      if (!org || Number(evento.id_organizador) !== Number(org.id_organizador)) {
+      if (Number(evento.id_usuario_organizador) !== Number(req.usuario.id)) {
         return res.status(403).json({ message: 'Sin permisos suficientes' });
       }
     }

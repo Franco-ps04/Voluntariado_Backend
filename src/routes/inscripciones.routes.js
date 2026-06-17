@@ -56,8 +56,8 @@ router.get('/', auth, soloRoles('admin', 'organizador'), async (req, res) => {
           u.id_usuario, u.nombre, u.email, u.telefono,
           a.id_asistencia, a.asistio
         FROM Inscripcion  i
-        JOIN Voluntario   v ON i.id_voluntario  = v.id_usuario
-        JOIN Usuario      u ON v.id_usuario     = u.id_usuario
+        JOIN Evento       e ON i.id_evento      = e.id_evento
+        JOIN Usuario      u ON i.id_voluntario  = u.id_usuario
         LEFT JOIN Asistencia a ON i.id_inscripcion = a.id_inscripcion
         WHERE i.id_evento = @evId
           AND ISNULL(e.archivado, 0) = 0
@@ -145,6 +145,14 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
             return res.status(500).json({ message: 'No se pudo registrar la inscripción' });
         }
 
+        await pool.request()
+            .input('idEv', sql.Int, Number(idEvento))
+            .query(`
+                UPDATE Evento
+                SET inscritos = CASE WHEN inscritos < capacidad THEN inscritos + 1 ELSE inscritos END
+                WHERE id_evento = @idEv
+            `);
+
         res.status(201).json({ id: newId, message: 'Inscripción realizada correctamente' });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -172,6 +180,16 @@ router.patch('/:id/cancelar', auth, soloRoles('voluntario'), async (req, res) =>
         await pool.request()
             .input('id', sql.Int, req.params.id)
             .query(`UPDATE Inscripcion SET estado = 'Cancelado' WHERE id_inscripcion = @id`);
+
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                UPDATE e
+                SET inscritos = CASE WHEN e.inscritos > 0 THEN e.inscritos - 1 ELSE 0 END
+                FROM Evento e
+                INNER JOIN Inscripcion i ON i.id_evento = e.id_evento
+                WHERE i.id_inscripcion = @id
+            `);
 
         res.json({ ok: true });
     } catch (err) {

@@ -105,17 +105,31 @@ async function limpiarDatosUsuarioSuspendido(pool, idUsuario, rol) {
   const normalizado = String(rol ?? '').trim().toLowerCase();
 
   if (normalizado === 'voluntario') {
+    // Al suspender a un voluntario solo se liberan sus inscripciones futuras,
+    // conservando su historial (mensajes, certificados y participaciones previas).
     await pool.request()
       .input('idU', sql.Int, idUsuario)
-      .query('DELETE FROM Certificado WHERE id_voluntario = @idU');
+      .query(`
+        DECLARE @Eventos TABLE (id_evento INT);
 
-    await pool.request()
-      .input('idU', sql.Int, idUsuario)
-      .query('DELETE FROM Inscripcion WHERE id_voluntario = @idU');
+        DELETE i
+        OUTPUT DELETED.id_evento INTO @Eventos
+        FROM Inscripcion i
+        INNER JOIN Evento e ON i.id_evento = e.id_evento
+        WHERE i.id_voluntario = @idU
+          AND ISNULL(e.archivado, 0) = 0
+          AND e.estado IN (N'Próximo', N'En curso');
 
-    await pool.request()
-      .input('idU', sql.Int, idUsuario)
-      .query('DELETE FROM Mensaje WHERE id_voluntario = @idU OR id_usuario_destino = @idU');
+        ;WITH Conteo AS (
+          SELECT id_evento, COUNT(*) AS cnt
+          FROM @Eventos
+          GROUP BY id_evento
+        )
+        UPDATE e
+        SET inscritos = CASE WHEN e.inscritos > c.cnt THEN e.inscritos - c.cnt ELSE 0 END
+        FROM Evento e
+        INNER JOIN Conteo c ON e.id_evento = c.id_evento;
+      `);
     return;
   }
 
@@ -129,7 +143,7 @@ async function limpiarDatosUsuarioSuspendido(pool, idUsuario, rol) {
         SELECT id_evento
         FROM Evento
         WHERE id_organizador = @idOrg
-          AND estado NOT IN (N'Finalizado', N'Cancelado')
+          AND estado IN (N'Próximo', N'En curso')
           AND ISNULL(archivado, 0) = 0
       `);
 

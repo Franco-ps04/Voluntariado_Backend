@@ -56,8 +56,7 @@ router.get('/:eventoId', auth, soloRoles('admin', 'organizador'), async (req, re
           a.id_asistencia, a.asistio,
           CONVERT(VARCHAR, a.fecha_registro, 120) AS fecha_registro
         FROM Inscripcion  i
-        JOIN Voluntario   v ON i.id_voluntario     = v.id_usuario
-        JOIN Usuario      u ON v.id_usuario        = u.id_usuario
+        JOIN Usuario      u ON i.id_voluntario     = u.id_usuario
         LEFT JOIN Asistencia a ON i.id_inscripcion = a.id_inscripcion
         WHERE i.id_evento = @evId
           AND i.estado != 'Cancelado'

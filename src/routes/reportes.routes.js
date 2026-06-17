@@ -48,9 +48,8 @@ router.get('/resumen', auth, soloRoles('admin', 'organizador'), async (req, res)
         u.nombre,
         COUNT(i.id_inscripcion) AS eventos
       FROM Usuario u
-      INNER JOIN Voluntario v ON u.id_usuario = v.id_usuario
-      LEFT JOIN Inscripcion i ON i.id_voluntario = v.id_usuario
-      WHERE u.activo = 1
+      LEFT JOIN Inscripcion i ON i.id_voluntario = u.id_usuario
+      WHERE u.activo = 1 AND u.rol = 'voluntario'
       GROUP BY u.id_usuario, u.nombre
       ORDER BY COUNT(i.id_inscripcion) DESC, u.nombre ASC
     `);
