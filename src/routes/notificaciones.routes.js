@@ -36,6 +36,7 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
           CASE WHEN nl.id_notificacion IS NOT NULL THEN 1 ELSE 0 END AS leida
         FROM Notificacion n
         JOIN Evento    e  ON n.id_evento = e.id_evento
+                          AND ISNULL(e.archivado, 0) = 0
         JOIN Usuario   u  ON n.id_usuario = u.id_usuario
         JOIN Inscripcion i ON i.id_evento  = e.id_evento
                           AND i.id_voluntario = @id
@@ -105,6 +106,7 @@ router.post('/', auth, soloRoles('admin', 'organizador'), async (req, res) => {
               SELECT e.id_evento, e.estado
               FROM Evento e
               WHERE e.id_evento = @idEvt
+                AND ISNULL(e.archivado, 0) = 0
             `);
 
         if (!evento.recordset[0]) {

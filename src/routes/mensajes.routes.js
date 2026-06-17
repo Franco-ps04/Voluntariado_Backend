@@ -117,6 +117,7 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
         INNER JOIN Usuario u ON m.id_voluntario = u.id_usuario
         INNER JOIN Usuario u2 ON m.id_usuario_destino = u2.id_usuario
         LEFT JOIN Evento e ON m.id_evento = e.id_evento
+                              AND ISNULL(e.archivado, 0) = 0
         WHERE m.id_voluntario = @id
         ORDER BY m.fecha DESC, m.id_mensaje DESC
       `);
@@ -190,6 +191,7 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
           FROM Evento e
           INNER JOIN Organizador o ON e.id_organizador = o.id_organizador
           WHERE e.id_evento = @idEvt
+            AND ISNULL(e.archivado, 0) = 0
         `);
 
       if (!evento.recordset[0]) {
@@ -204,7 +206,7 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
       }
 
       if (destinoOk.recordset[0].rol === 'organizador' &&
-          Number(destinoOk.recordset[0].id_usuario) !== Number(evento.recordset[0].id_usuario_organizador)) {
+        Number(destinoOk.recordset[0].id_usuario) !== Number(evento.recordset[0].id_usuario_organizador)) {
         return res.status(400).json({
           message: 'El organizador seleccionado no corresponde al evento'
         });
@@ -328,6 +330,7 @@ router.get('/panel', auth, soloRoles('admin', 'organizador'), async (req, res) =
         INNER JOIN Usuario u ON m.id_voluntario = u.id_usuario
         INNER JOIN Usuario u2 ON m.id_usuario_destino = u2.id_usuario
         LEFT JOIN Evento e ON m.id_evento = e.id_evento
+                              AND ISNULL(e.archivado, 0) = 0
         WHERE m.id_usuario_destino = @idDest
         ORDER BY m.fecha DESC, m.id_mensaje DESC
       `);

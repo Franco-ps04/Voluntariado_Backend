@@ -30,6 +30,7 @@ router.get('/mis', auth, soloRoles('voluntario'), async (req, res) => {
         JOIN Usuario     u ON o.id_usuario   = u.id_usuario
         LEFT JOIN Asistencia a ON i.id_inscripcion = a.id_inscripcion
         WHERE i.id_voluntario = @id
+          AND ISNULL(e.archivado, 0) = 0
         ORDER BY e.fecha DESC
       `);
         res.json(result.recordset);
@@ -59,6 +60,7 @@ router.get('/', auth, soloRoles('admin', 'organizador'), async (req, res) => {
         JOIN Usuario      u ON v.id_usuario     = u.id_usuario
         LEFT JOIN Asistencia a ON i.id_inscripcion = a.id_inscripcion
         WHERE i.id_evento = @evId
+          AND ISNULL(e.archivado, 0) = 0
         ORDER BY u.nombre
       `);
         res.json(result.recordset);
@@ -95,7 +97,7 @@ router.post('/', auth, soloRoles('voluntario'), async (req, res) => {
         // Verificar que el evento tenga cupo
         const evento = await pool.request()
             .input('idEv', sql.Int, idEvento)
-            .query('SELECT capacidad, inscritos, estado FROM Evento WHERE id_evento = @idEv');
+            .query('SELECT capacidad, inscritos, estado FROM Evento WHERE id_evento = @idEv AND ISNULL(archivado, 0) = 0');
 
         const ev = evento.recordset[0];
         if (!ev)

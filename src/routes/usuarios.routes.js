@@ -101,6 +101,69 @@ router.get('/destinatarios-activos', auth, soloRoles('voluntario'), async (req, 
   }
 });
 
+async function limpiarDatosUsuarioSuspendido(pool, idUsuario, rol) {
+  const normalizado = String(rol ?? '').trim().toLowerCase();
+
+  if (normalizado === 'voluntario') {
+    await pool.request()
+      .input('idU', sql.Int, idUsuario)
+      .query('DELETE FROM Certificado WHERE id_voluntario = @idU');
+
+    await pool.request()
+      .input('idU', sql.Int, idUsuario)
+      .query('DELETE FROM Inscripcion WHERE id_voluntario = @idU');
+
+    await pool.request()
+      .input('idU', sql.Int, idUsuario)
+      .query('DELETE FROM Mensaje WHERE id_voluntario = @idU OR id_usuario_destino = @idU');
+    return;
+  }
+
+  if (normalizado === 'organizador' || normalizado === 'admin') {
+    const org = await getOrganizadorByUsuarioId(pool, idUsuario);
+    if (!org) return;
+
+    const eventos = await pool.request()
+      .input('idOrg', sql.Int, org.id_organizador)
+      .query(`
+        SELECT id_evento
+        FROM Evento
+        WHERE id_organizador = @idOrg
+          AND estado NOT IN (N'Finalizado', N'Cancelado')
+          AND ISNULL(archivado, 0) = 0
+      `);
+
+    for (const ev of eventos.recordset) {
+      const idEvento = Number(ev.id_evento);
+
+      await pool.request()
+        .input('idEv', sql.Int, idEvento)
+        .query('DELETE FROM Mensaje WHERE id_evento = @idEv');
+
+      await pool.request()
+        .input('idEv', sql.Int, idEvento)
+        .query('DELETE FROM Notificacion WHERE id_evento = @idEv');
+
+      await pool.request()
+        .input('idEv', sql.Int, idEvento)
+        .query(`
+          DELETE a
+          FROM Asistencia a
+          INNER JOIN Inscripcion i ON a.id_inscripcion = i.id_inscripcion
+          WHERE i.id_evento = @idEv
+        `);
+
+      await pool.request()
+        .input('idEv', sql.Int, idEvento)
+        .query('DELETE FROM Inscripcion WHERE id_evento = @idEv');
+
+      await pool.request()
+        .input('idEv', sql.Int, idEvento)
+        .query('DELETE FROM Evento WHERE id_evento = @idEv');
+    }
+  }
+}
+
 //GET /api/usuarios/:id
 router.get('/:id', auth, soloRoles('admin'), async (req, res) => {
   try {
@@ -196,10 +259,26 @@ router.patch('/:id/estado', auth, soloRoles('admin'), async (req, res) => {
 
   try {
     const pool = await getPool();
+
+    const current = await pool.request()
+      .input('id', sql.Int, req.params.id)
+      .query(`
+        SELECT u.rol
+        FROM Usuario u
+        WHERE u.id_usuario = @id
+      `);
+
+    const rolActual = current.recordset[0]?.rol ?? null;
+
+    if (req.body.activo === false && rolActual) {
+      await limpiarDatosUsuarioSuspendido(pool, Number(req.params.id), rolActual);
+    }
+
     await pool.request()
       .input('id', sql.Int, req.params.id)
       .input('activo', sql.Bit, req.body.activo ? 1 : 0)
       .query('UPDATE Usuario SET activo = @activo WHERE id_usuario = @id');
+
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: err.message });

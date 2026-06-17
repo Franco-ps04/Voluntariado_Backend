@@ -158,6 +158,7 @@ async function getEventoById(pool, idEvento) {
       INNER JOIN Organizador o ON e.id_organizador = o.id_organizador
       INNER JOIN Usuario u ON o.id_usuario = u.id_usuario
       WHERE e.id_evento = @id
+        AND ISNULL(e.archivado, 0) = 0
     `);
 
   if (!result.recordset[0]) return null;
@@ -290,6 +291,7 @@ router.get('/', async (req, res) => {
       where.push('t.nombre = @tipo');
       request.input('tipo', sql.NVarChar, req.query.tipo);
     }
+    where.push('ISNULL(e.archivado, 0) = 0');
     if (req.query.estado) {
       where.push('e.estado = @estado');
       request.input('estado', sql.NVarChar, req.query.estado);
@@ -343,14 +345,14 @@ router.get('/gestion', auth, soloRoles('admin', 'organizador'), async (req, res)
     const pool = await getPool();
     const request = pool.request();
 
-    let extraWhere = '';
+    let extraWhere = 'WHERE ISNULL(e.archivado, 0) = 0';
     if (req.usuario.rol === 'organizador') {
       const org = await getOrganizadorByUsuarioId(pool, req.usuario.id);
       if (!org) {
         return res.json([]);
       }
       request.input('idOrg', sql.Int, org.id_organizador);
-      extraWhere = 'WHERE e.id_organizador = @idOrg';
+      extraWhere = 'WHERE ISNULL(e.archivado, 0) = 0 AND e.id_organizador = @idOrg';
     }
 
     const result = await request.query(`
@@ -641,7 +643,7 @@ router.patch('/:id/estado', auth, soloRoles('admin', 'organizador'), async (req,
 });
 
 // DELETE /api/eventos/:id
-// Se usa como cancelación/archivo para conservar historial de inscripciones y certificados
+// Archivo lógico: solo oculta el evento del listado global sin borrar su historial
 router.delete('/:id', auth, soloRoles('admin', 'organizador'), async (req, res) => {
   try {
     const pool = await getPool();
@@ -658,16 +660,11 @@ router.delete('/:id', auth, soloRoles('admin', 'organizador'), async (req, res) 
       }
     }
 
-    if (evento.estado !== 'Cancelado') {
-      await pool.request()
-        .input('estado', sql.NVarChar(13), 'Cancelado')
-        .input('id', sql.Int, Number(req.params.id))
-        .query('UPDATE Evento SET estado = @estado WHERE id_evento = @id');
+    await pool.request()
+      .input('id', sql.Int, Number(req.params.id))
+      .query('UPDATE Evento SET archivado = 1 WHERE id_evento = @id');
 
-      await registrarCambioEstadoEvento(pool, Number(req.params.id), 'Cancelado', req.usuario.id);
-    }
-
-    res.json({ ok: true, estado: 'Cancelado' });
+    res.json({ ok: true, archivado: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -22,8 +22,11 @@ router.post('/login', async (req, res) => {
               WHERE email = @email`);
 
     const user = result.recordset[0];
-    if (!user || !user.activo)
+    if (!user)
       return res.status(401).json({ message: 'Credenciales inválidas' });
+
+    if (!user.activo)
+      return res.status(403).json({ message: 'Cuenta suspendida' });
 
     // Verificar contraseña con bcrypt
     const ok = await bcrypt.compare(password, user.contrasena);
@@ -116,4 +119,3 @@ router.get('/me', auth, (req, res) => {
 });
 
 module.exports = router;
-
