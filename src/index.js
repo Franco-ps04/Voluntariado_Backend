@@ -25,6 +25,7 @@ app.use('/api/eventos', require('./routes/eventos.routes'));
 app.use('/api/inscripciones', require('./routes/inscripciones.routes'));
 app.use('/api/asistencia', require('./routes/asistencia.routes'));
 app.use('/api/mensajes', require('./routes/mensajes.routes'));
+app.use('/api/contacto', require('./routes/contacto.routes'))
 app.use('/api/notificaciones', require('./routes/notificaciones.routes'));
 app.use('/api/usuarios', require('./routes/usuarios.routes'));
 app.use('/api/certificados', require('./routes/certificados.routes'));
