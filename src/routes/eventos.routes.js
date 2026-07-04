@@ -74,6 +74,34 @@ function toOptionalNumber(value) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+function toIsoDate(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function toTime(date = new Date()) {
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  return `${h}:${m}:00`;
+}
+
+function validateDateTime(fecha, hora) {
+  const rawFecha = String(fecha ?? '').trim();
+  const rawHora = String(hora ?? '').trim();
+  if (!rawFecha || !rawHora) return 'Faltan campos obligatorios';
+
+  const fechaHora = new Date(`${rawFecha}T${rawHora.length === 5 ? `${rawHora}:00` : rawHora}`);
+  if (Number.isNaN(fechaHora.getTime())) return 'Fecha u hora inválida';
+
+  const now = new Date();
+  if (fechaHora.getTime() < now.getTime()) {
+    return 'La fecha y hora no pueden ser anteriores al momento actual';
+  }
+  return null;
+}
+
 function validateCoordinates(latitud, longitud) {
   if (latitud !== null && !Number.isFinite(latitud)) return 'Latitud inválida';
   if (longitud !== null && !Number.isFinite(longitud)) return 'Longitud inválida';
@@ -214,11 +242,24 @@ async function resolveEventPayload(req, pool, existingEvento = null) {
     return { error: 'Faltan campos obligatorios' };
   }
 
+  const datetimeError = validateDateTime(fechaLimpia, horaNormalizada);
+  if (datetimeError) {
+    return { error: datetimeError };
+  }
+
   const lat = toOptionalNumber(latitud);
   const lon = toOptionalNumber(longitud);
   const coordError = validateCoordinates(lat, lon);
   if (coordError) {
     return { error: coordError };
+  }
+
+  const capacidadNum = Number(capacidad);
+  if (!Number.isFinite(capacidadNum) || capacidadNum < 1) {
+    return { error: 'La capacidad debe ser al menos 1' };
+  }
+  if (capacidadNum > 50) {
+    return { error: 'La capacidad máxima permitida es 50 voluntarios' };
   }
 
   let idOrgReal = null;
@@ -270,7 +311,7 @@ async function resolveEventPayload(req, pool, existingEvento = null) {
     fecha: fechaLimpia,
     hora: horaNormalizada,
     ubicacion: ubicacionLimpia,
-    capacidad: Number.isFinite(Number(capacidad)) ? Number(capacidad) : 30,
+    capacidad: capacidadNum,
     idTipo: tipoId,
     idOrgReal,
     latitud: lat,

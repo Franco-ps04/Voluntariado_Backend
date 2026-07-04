@@ -20,15 +20,19 @@ function escapeHtml(value) {
 }
 
 function crearTransporter() {
-    const user = process.env.GMAIL_USER || process.env.SMTP_USER;
-    const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+    const host = process.env.SMTP_HOST;
+    const port = Number(process.env.SMTP_PORT || 587);
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
 
-    if (!user || !pass) {
+    if (!host || !user || !pass) {
         return null;
     }
 
     return nodemailer.createTransport({
-        service: 'gmail',
+        host,
+        port,
+        secure: port === 465,
         auth: { user, pass }
     });
 }
@@ -94,21 +98,23 @@ router.post('/', async (req, res) => {
       `);
 
         const idContacto = insert.recordset[0]?.id_contacto ?? null;
-        const mailerUser = process.env.GMAIL_USER || process.env.SMTP_USER;
         const transporter = crearTransporter();
-        const destino = process.env.CONTACTO_DESTINO_EMAIL || mailerUser || 'greenunity@gmail.com';
+        const destino = process.env.CONTACT_EMAIL || process.env.CONTACTO_DESTINO_EMAIL || process.env.SMTP_USER;
+
+        if (!destino) {
+            return res.status(500).json({
+                message: 'Falta definir el correo destino en CONTACT_EMAIL'
+            });
+        }
 
         if (!transporter) {
-            return res.status(201).json({
-                ok: true,
-                id: idContacto,
-                mailSent: false,
-                message: 'Mensaje recibido. Configura Gmail para habilitar el envío automático de correo.'
+            return res.status(500).json({
+                message: 'Falta configurar SMTP_HOST, SMTP_PORT, SMTP_USER o SMTP_PASS'
             });
         }
 
         await transporter.sendMail({
-            from: `"GreenUnity" <${mailerUser}>`,
+            from: `"GreenUnity" <${process.env.SMTP_USER}>`,
             to: destino,
             replyTo: email,
             subject: `[Contacto] ${asunto}`,

@@ -4,6 +4,16 @@ const jwt = require('jsonwebtoken');
 const { sql, getPool } = require('../database/db');
 const auth = require('../middlewares/auth');
 
+function soloDigitos(value) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function validarPassword(password) {
+  const raw = String(password ?? '');
+  return raw.length >= 8 && /[A-Za-z]/.test(raw) && /\d/.test(raw);
+}
+
+
 // POST /api/auth/login
 // Body: { email, password }
 // Responde: { id, nombre, email, rol, token }
@@ -109,6 +119,57 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ id: newId, nombre, email, rol: 'voluntario', token });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/auth/recuperar-contrasena
+// Body: { email, telefono, nuevaContrasena }
+router.post('/recuperar-contrasena', async (req, res) => {
+  const email = String(req.body.email ?? '').trim();
+  const telefono = soloDigitos(req.body.telefono);
+  const nuevaContrasena = String(req.body.nuevaContrasena ?? '');
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ message: 'Ingresa un correo válido' });
+  }
+  if (!telefono || telefono.length !== 9) {
+    return res.status(400).json({ message: 'Ingresa un teléfono válido de 9 dígitos' });
+  }
+  if (!nuevaContrasena || !validarPassword(nuevaContrasena)) {
+    return res.status(400).json({ message: 'La nueva contraseña debe tener al menos 8 caracteres, una letra y un número' });
+  }
+
+  try {
+    const pool = await getPool();
+
+    const result = await pool.request()
+      .input('email', sql.NVarChar, email)
+      .input('telefono', sql.NVarChar, telefono)
+      .query(`
+        SELECT id_usuario, activo
+        FROM Usuario
+        WHERE email = @email AND telefono = @telefono
+      `);
+
+    const user = result.recordset[0];
+    if (!user) {
+      return res.status(404).json({ message: 'No encontramos una cuenta con esos datos' });
+    }
+
+    if (!user.activo) {
+      return res.status(403).json({ message: 'La cuenta está suspendida' });
+    }
+
+    const hash = await bcrypt.hash(nuevaContrasena, 10);
+
+    await pool.request()
+      .input('id', sql.Int, user.id_usuario)
+      .input('hash', sql.NVarChar, hash)
+      .query('UPDATE Usuario SET contrasena = @hash WHERE id_usuario = @id');
+
+    return res.json({ ok: true, message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message || 'No se pudo actualizar la contraseña' });
   }
 });
 
