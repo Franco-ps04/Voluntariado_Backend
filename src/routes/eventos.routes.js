@@ -87,6 +87,48 @@ function toTime(date = new Date()) {
   return `${h}:${m}:00`;
 }
 
+function parseFechaHoraISO(fecha, hora) {
+  const rawFecha = String(fecha ?? '').trim();
+  const rawHora = String(hora ?? '').trim();
+  if (!rawFecha || !rawHora) return null;
+
+  const fechaParts = rawFecha.split('-').map(Number);
+  const horaParts = rawHora.split(':').map(Number);
+  if (fechaParts.length !== 3 || horaParts.length < 2) return null;
+
+  const [y, m, d] = fechaParts;
+  const [hh, mm, ss = 0] = horaParts;
+  const date = new Date(y, m - 1, d, hh, mm, ss);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function calcularEstadoAutomatico(evento, ahora = new Date()) {
+  const estado = String(evento?.estado ?? '').trim();
+  if (['Cancelado', 'Finalizado'].includes(estado)) return estado;
+
+  const fechaHora = parseFechaHoraISO(evento?.fecha, evento?.hora);
+  if (!fechaHora) return estado || 'Próximo';
+
+  const duracionHoras = Number(process.env.EVENT_DURATION_HOURS ?? 2);
+  const finEstimado = new Date(fechaHora.getTime() + (Number.isFinite(duracionHoras) ? duracionHoras : 2) * 60 * 60 * 1000);
+
+  if (ahora < fechaHora) return 'Próximo';
+  if (ahora >= fechaHora && ahora < finEstimado) return 'En curso';
+  return 'Finalizado';
+}
+
+async function sincronizarEstadoAutomatico(pool, evento) {
+  const nuevoEstado = calcularEstadoAutomatico(evento);
+  const actual = String(evento?.estado ?? '').trim();
+  if (nuevoEstado !== actual && Number(evento?.id_evento)) {
+    await pool.request()
+      .input('estado', sql.NVarChar(20), nuevoEstado)
+      .input('id', sql.Int, Number(evento.id_evento))
+      .query('UPDATE Evento SET estado = @estado WHERE id_evento = @id');
+  }
+  return { ...evento, estado: nuevoEstado };
+}
+
 function validateDateTime(fecha, hora) {
   const rawFecha = String(fecha ?? '').trim();
   const rawHora = String(hora ?? '').trim();
@@ -190,8 +232,9 @@ async function getEventoById(pool, idEvento) {
     `);
 
   if (!result.recordset[0]) return null;
-  const evento = result.recordset[0];
+  let evento = result.recordset[0];
   evento.requisitos = await getRequisitosByEvento(pool, idEvento);
+  evento = await sincronizarEstadoAutomatico(pool, evento);
   return evento;
 }
 
@@ -369,7 +412,8 @@ router.get('/', async (req, res) => {
     const data = [];
     for (const ev of result.recordset) {
       const requisitos = await getRequisitosByEvento(pool, ev.id_evento);
-      data.push({ ...ev, requisitos });
+      const normalizado = await sincronizarEstadoAutomatico(pool, { ...ev, requisitos });
+      data.push(normalizado);
     }
 
     res.json(data);
@@ -426,7 +470,8 @@ router.get('/gestion', auth, soloRoles('admin', 'organizador'), async (req, res)
     const data = [];
     for (const ev of result.recordset) {
       const requisitos = await getRequisitosByEvento(pool, ev.id_evento);
-      data.push({ ...ev, requisitos });
+      const normalizado = await sincronizarEstadoAutomatico(pool, { ...ev, requisitos });
+      data.push(normalizado);
     }
 
     res.json(data);

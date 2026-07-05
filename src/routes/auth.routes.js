@@ -8,6 +8,10 @@ function soloDigitos(value) {
   return String(value ?? '').replace(/\D/g, '');
 }
 
+function validarEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email ?? '').trim());
+}
+
 function validarPassword(password) {
   const raw = String(password ?? '');
   return raw.length >= 8 && /[A-Za-z]/.test(raw) && /\d/.test(raw);
@@ -18,9 +22,15 @@ function validarPassword(password) {
 // Body: { email, password }
 // Responde: { id, nombre, email, rol, token }
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ message: 'Email y contraseña requeridos' });
+  const email = String(req.body.email ?? '').trim();
+  const password = String(req.body.password ?? '');
+
+  if (!email || !validarEmail(email)) {
+    return res.status(400).json({ message: 'Ingresa un correo electrónico válido' });
+  }
+  if (!password) {
+    return res.status(400).json({ message: 'Ingresa tu contraseña' });
+  }
 
   try {
     const pool = await getPool();
@@ -70,9 +80,23 @@ router.post('/login', async (req, res) => {
 //POST /api/auth/register
 // Body: { nombre, email, password, telefono }
 router.post('/register', async (req, res) => {
-  const { nombre, email, password, telefono } = req.body;
-  if (!nombre || !email || !password || !telefono)
-    return res.status(400).json({ message: 'Todos los campos son requeridos' });
+  const nombre = String(req.body.nombre ?? '').trim();
+  const email = String(req.body.email ?? '').trim();
+  const password = String(req.body.password ?? '');
+  const telefono = soloDigitos(req.body.telefono);
+
+  if (!nombre || nombre.length < 3) {
+    return res.status(400).json({ message: 'El nombre debe tener al menos 3 caracteres' });
+  }
+  if (!email || !validarEmail(email)) {
+    return res.status(400).json({ message: 'Ingresa un correo válido' });
+  }
+  if (!password || !validarPassword(password)) {
+    return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres, una letra y un número' });
+  }
+  if (!telefono || telefono.length !== 9) {
+    return res.status(400).json({ message: 'El teléfono debe tener 9 dígitos' });
+  }
 
   try {
     const pool = await getPool();
@@ -129,7 +153,7 @@ router.post('/recuperar-contrasena', async (req, res) => {
   const telefono = soloDigitos(req.body.telefono);
   const nuevaContrasena = String(req.body.nuevaContrasena ?? '');
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || !validarEmail(email)) {
     return res.status(400).json({ message: 'Ingresa un correo válido' });
   }
   if (!telefono || telefono.length !== 9) {

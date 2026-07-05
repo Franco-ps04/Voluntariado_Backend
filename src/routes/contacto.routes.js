@@ -116,7 +116,7 @@ router.post('/', async (req, res) => {
         await transporter.sendMail({
             from: `"GreenUnity" <${process.env.SMTP_USER}>`,
             to: destino,
-            replyTo: email,
+            replyTo: { name: nombre, address: email },
             subject: `[Contacto] ${asunto}`,
             html: crearCuerpoCorreo({ nombre, telefono, email, asunto, mensaje }),
             text: `Nombre: ${nombre}\nTeléfono: ${telefono || 'No indicado'}\nCorreo: ${email}\nAsunto: ${asunto}\n\nMensaje:\n${mensaje}`
