@@ -50,6 +50,15 @@ function toOptionalNumber(value) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+// Perú no tiene horario de verano: siempre es UTC-5. La fecha/hora que
+// manda el frontend viene en hora local de Perú, sin indicar zona horaria
+// (p. ej. "2026-07-12" y "20:29"). Si se la pasamos tal cual a `new Date()`,
+// JavaScript la interpreta como hora local del SERVIDOR (Render corre en
+// UTC), no como hora de Perú, y el resultado queda desfasado 5 horas.
+// Por eso hay que anclar explícitamente el offset "-05:00" al construir
+// el Date, en vez de dejar que dependa de la zona horaria del proceso.
+const OFFSET_PERU = '-05:00';
+
 function parseFechaHoraISO(fecha, hora) {
   const rawFecha = String(fecha ?? '').trim();
   const rawHora = String(hora ?? '').trim();
@@ -59,9 +68,11 @@ function parseFechaHoraISO(fecha, hora) {
   const horaParts = rawHora.split(':').map(Number);
   if (fechaParts.length !== 3 || horaParts.length < 2) return null;
 
-  const [y, m, d] = fechaParts;
   const [hh, mm, ss = 0] = horaParts;
-  const date = new Date(y, m - 1, d, hh, mm, ss);
+  if (![hh, mm, ss].every(Number.isFinite)) return null;
+
+  const horaConSegundos = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  const date = new Date(`${rawFecha}T${horaConSegundos}${OFFSET_PERU}`);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -85,7 +96,8 @@ function validateDateTime(fecha, hora) {
   const rawHora = String(hora ?? '').trim();
   if (!rawFecha || !rawHora) return 'Faltan campos obligatorios';
 
-  const fechaHora = new Date(`${rawFecha}T${rawHora.length === 5 ? `${rawHora}:00` : rawHora}`);
+  const horaConSegundos = rawHora.length === 5 ? `${rawHora}:00` : rawHora;
+  const fechaHora = new Date(`${rawFecha}T${horaConSegundos}${OFFSET_PERU}`);
   if (Number.isNaN(fechaHora.getTime())) return 'Fecha u hora inválida';
 
   // Margen de tolerancia: entre que el usuario llena el formulario, hace
