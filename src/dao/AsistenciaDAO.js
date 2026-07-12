@@ -12,7 +12,7 @@ class AsistenciaDAO extends BaseDAO {
          i.id_inscripcion,
          u.id_usuario, u.nombre, u.email, u.telefono,
          a.id_asistencia, a.asistio,
-         TO_CHAR(a.fecha_registro, 'YYYY-MM-DD HH24:MI:SS') AS fecha_registro
+         TO_CHAR(a.fecha_registro, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha_registro
        FROM Inscripcion  i
        JOIN Usuario      u ON i.id_voluntario     = u.id_usuario
        LEFT JOIN Asistencia a ON i.id_inscripcion = a.id_inscripcion

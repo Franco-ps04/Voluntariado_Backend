@@ -10,7 +10,7 @@ class NotificacionDAO extends BaseDAO {
     const { rows } = await query(
       `SELECT
          n.id_notificacion, n.titulo, n.mensaje,
-         TO_CHAR(n.fecha, 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+         TO_CHAR(n.fecha, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha,
          e.nombre  AS evento,
          e.estado  AS estado_evento,
          u.nombre  AS enviado_por,
@@ -63,7 +63,7 @@ class NotificacionDAO extends BaseDAO {
   async listarEnviadasPor(idUsuario) {
     const { rows } = await query(
       `SELECT n.id_notificacion, n.titulo, n.mensaje,
-              TO_CHAR(n.fecha, 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+              TO_CHAR(n.fecha, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha,
               e.nombre AS evento
        FROM Notificacion n
        JOIN Evento e ON n.id_evento = e.id_evento

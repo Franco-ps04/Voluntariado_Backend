@@ -5,7 +5,7 @@ const CAMPOS_MENSAJE = `
   m.id_mensaje,
   m.asunto,
   m.mensaje,
-  TO_CHAR(m.fecha, 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+  TO_CHAR(m.fecha, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha,
   m.leido,
   m.leido_por_voluntario,
   m.respondido,
@@ -28,7 +28,7 @@ class MensajeDAO extends BaseDAO {
       `SELECT
          r.id_respuesta,
          r.texto,
-         TO_CHAR(r.fecha, 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+         TO_CHAR(r.fecha, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha,
          u.nombre AS respondido_por,
          u.rol AS rol_usuario,
          CASE WHEN u.rol = 'voluntario' THEN 'voluntario' ELSE 'admin' END AS tipo
@@ -45,7 +45,7 @@ class MensajeDAO extends BaseDAO {
     const { rows } = await query(
       `SELECT
          m.id_mensaje, m.asunto, m.mensaje,
-         TO_CHAR(m.fecha, 'YYYY-MM-DD HH24:MI:SS') AS fecha,
+         TO_CHAR(m.fecha, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS fecha,
          m.leido, m.leido_por_voluntario, m.respondido,
          m.id_voluntario AS "idRemitente",
          m.id_usuario_destino AS "idDestinatario",
