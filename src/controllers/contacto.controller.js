@@ -1,6 +1,6 @@
 const contactoDAO = require('../dao/ContactoDAO');
 const { soloDigitos, validarEmail } = require('../utils/validators');
-const { crearTransporter, crearCuerpoCorreoContacto } = require('../utils/mailer');
+const { enviarCorreo, crearCuerpoCorreoContacto } = require('../utils/mailer');
 
 // POST /api/contacto
 async function enviar(req, res) {
@@ -35,18 +35,20 @@ async function enviar(req, res) {
   try {
     const idContacto = await contactoDAO.crear({ nombre, telefono, email, asunto, mensaje });
 
-    const transporter = crearTransporter();
     const destino = process.env.CONTACT_EMAIL || process.env.CONTACTO_DESTINO_EMAIL || process.env.SMTP_USER;
+    // Mientras no verifiques un dominio propio en Resend, el remitente debe
+    // ser el dominio de prueba "onboarding@resend.dev" (solo puede enviar
+    // al correo con el que creaste la cuenta de Resend). Al verificar tu
+    // propio dominio, cambia RESEND_FROM por algo como
+    // "GreenUnity <contacto@tudominio.com>".
+    const remitente = process.env.RESEND_FROM || 'GreenUnity <onboarding@resend.dev>';
 
     if (!destino) {
       return res.status(500).json({ message: 'Falta definir el correo destino en CONTACT_EMAIL' });
     }
-    if (!transporter) {
-      return res.status(500).json({ message: 'Falta configurar SMTP_HOST, SMTP_PORT, SMTP_USER o SMTP_PASS' });
-    }
 
-    await transporter.sendMail({
-      from: `"GreenUnity" <${process.env.SMTP_USER}>`,
+    await enviarCorreo({
+      from: remitente,
       to: destino,
       replyTo: `${nombre} <${email.trim()}>`,
       subject: `[Contacto] ${asunto}`,
