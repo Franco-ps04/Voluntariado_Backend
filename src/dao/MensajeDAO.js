@@ -81,7 +81,6 @@ class MensajeDAO extends BaseDAO {
        INNER JOIN Usuario u ON m.id_voluntario = u.id_usuario
        INNER JOIN Usuario u2 ON m.id_usuario_destino = u2.id_usuario
        LEFT JOIN Evento e ON m.id_evento = e.id_evento
-                          AND COALESCE(e.archivado, false) = false
        WHERE m.id_voluntario = $1
        ORDER BY m.fecha DESC, m.id_mensaje DESC`,
       [idVoluntario]
@@ -96,7 +95,6 @@ class MensajeDAO extends BaseDAO {
        INNER JOIN Usuario u ON m.id_voluntario = u.id_usuario
        INNER JOIN Usuario u2 ON m.id_usuario_destino = u2.id_usuario
        LEFT JOIN Evento e ON m.id_evento = e.id_evento
-                          AND COALESCE(e.archivado, false) = false
        WHERE m.id_usuario_destino = $1
        ORDER BY m.fecha DESC, m.id_mensaje DESC`,
       [idUsuarioDestino]

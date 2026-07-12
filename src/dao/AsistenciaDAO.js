@@ -51,7 +51,7 @@ class AsistenciaDAO extends BaseDAO {
 
   async countConfirmadasPorVoluntario(idVoluntario) {
     const { rows } = await query(
-      `SELECT COUNT(*) AS total
+      `SELECT COUNT(*)::int AS total
        FROM Asistencia a
        JOIN Inscripcion i ON a.id_inscripcion = i.id_inscripcion
        WHERE i.id_voluntario = $1 AND a.asistio = true`,

@@ -5,6 +5,7 @@ const inscripcionDAO = require('../dao/InscripcionDAO');
 const asistenciaDAO = require('../dao/AsistenciaDAO');
 const mensajeDAO = require('../dao/MensajeDAO');
 const notificacionDAO = require('../dao/NotificacionDAO');
+const { generarExcelUsuarios, generarPdfUsuarios } = require('../utils/exportUsuarios');
 
 // Limpia los datos afectados al suspender una cuenta:
 //  - voluntario: libera (elimina) sus inscripciones a eventos aún no
@@ -141,4 +142,49 @@ async function miPerfil(req, res) {
   }
 }
 
-module.exports = { listar, destinatariosActivos, obtener, actualizar, cambiarEstado, miPerfil };
+// GET /api/usuarios/exportar?formato=xlsx|pdf&id=<opcional>&rol=<opcional>&buscar=<opcional>
+// Sin "id": exporta el listado completo (respetando rol/buscar si se envían).
+// Con "id": exporta solo ese usuario (respaldo puntual, ej. antes de suspenderlo).
+async function exportar(req, res) {
+  const formato = String(req.query.formato ?? '').toLowerCase();
+  if (!['xlsx', 'pdf'].includes(formato)) {
+    return res.status(400).json({ message: 'El formato debe ser "xlsx" o "pdf"' });
+  }
+
+  try {
+    let usuarios;
+    let titulo;
+
+    if (req.query.id) {
+      const usuario = await usuarioDAO.findConOrganizacion(req.query.id);
+      if (!usuario) {
+        return res.status(404).json({ message: 'Usuario no encontrado' });
+      }
+      usuarios = [usuario];
+      titulo = `Usuario - ${usuario.nombre}`;
+    } else {
+      usuarios = await usuarioDAO.listar({ rol: req.query.rol, buscar: req.query.buscar });
+      titulo = 'Listado de usuarios';
+    }
+
+    const nombreArchivoBase = req.query.id
+      ? `usuario_${req.query.id}`
+      : `usuarios_${new Date().toISOString().slice(0, 10)}`;
+
+    if (formato === 'xlsx') {
+      const buffer = await generarExcelUsuarios(usuarios, titulo);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivoBase}.xlsx"`);
+      return res.send(buffer);
+    }
+
+    const buffer = await generarPdfUsuarios(usuarios, titulo);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivoBase}.pdf"`);
+    return res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+
+module.exports = { listar, destinatariosActivos, obtener, actualizar, cambiarEstado, miPerfil, exportar };

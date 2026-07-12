@@ -27,7 +27,6 @@ class InscripcionDAO extends BaseDAO {
        JOIN Usuario     u ON o.id_usuario   = u.id_usuario
        LEFT JOIN Asistencia a ON i.id_inscripcion = a.id_inscripcion
        WHERE i.id_voluntario = $1
-         AND COALESCE(e.archivado, false) = false
        ORDER BY e.fecha DESC`,
       [idVoluntario]
     );
@@ -45,7 +44,6 @@ class InscripcionDAO extends BaseDAO {
        JOIN Usuario      u ON i.id_voluntario  = u.id_usuario
        LEFT JOIN Asistencia a ON i.id_inscripcion = a.id_inscripcion
        WHERE i.id_evento = $1
-         AND COALESCE(e.archivado, false) = false
        ORDER BY u.nombre`,
       [idEvento]
     );

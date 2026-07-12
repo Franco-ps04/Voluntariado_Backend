@@ -28,8 +28,8 @@ class ReporteDAO {
        LEFT JOIN (
          SELECT
            i.id_evento,
-           SUM(CASE WHEN a.asistio = true THEN 1 ELSE 0 END) AS asistieron,
-           SUM(CASE WHEN a.asistio = false THEN 1 ELSE 0 END) AS "noAsistieron"
+           SUM(CASE WHEN a.asistio = true THEN 1 ELSE 0 END)::int AS asistieron,
+           SUM(CASE WHEN a.asistio = false THEN 1 ELSE 0 END)::int AS "noAsistieron"
          FROM Inscripcion i
          LEFT JOIN Asistencia a ON a.id_inscripcion = i.id_inscripcion
          GROUP BY i.id_evento
@@ -44,7 +44,7 @@ class ReporteDAO {
       `SELECT
          u.id_usuario,
          u.nombre,
-         COUNT(i.id_inscripcion) AS eventos
+         COUNT(i.id_inscripcion)::int AS eventos
        FROM Usuario u
        LEFT JOIN Inscripcion i ON i.id_voluntario = u.id_usuario
        WHERE u.activo = true AND u.rol = 'voluntario'

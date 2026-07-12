@@ -10,7 +10,7 @@ const SELECT_EVENTO_BASE = `
     TO_CHAR(e.hora, 'HH24:MI:SS') AS hora,
     e.ubicacion,
     e.capacidad,
-    COALESCE((SELECT COUNT(*) FROM Inscripcion i WHERE i.id_evento = e.id_evento AND i.estado <> 'Cancelado'), 0) AS inscritos,
+    COALESCE((SELECT COUNT(*)::int FROM Inscripcion i WHERE i.id_evento = e.id_evento AND i.estado <> 'Cancelado'), 0) AS inscritos,
     e.estado,
     e.latitud,
     e.longitud,
@@ -58,8 +58,7 @@ class EventoDAO extends BaseDAO {
   async findByIdCompleto(idEvento) {
     const { rows } = await query(
       `${SELECT_EVENTO_BASE}
-       WHERE e.id_evento = $1
-         AND COALESCE(e.archivado, false) = false`,
+       WHERE e.id_evento = $1`,
       [idEvento]
     );
     return rows[0] || null;
@@ -104,7 +103,7 @@ class EventoDAO extends BaseDAO {
          TO_CHAR(e.fecha, 'YYYY-MM-DD') AS fecha,
          TO_CHAR(e.hora, 'HH24:MI:SS') AS hora,
          e.ubicacion, e.capacidad,
-         COALESCE((SELECT COUNT(*) FROM Inscripcion i WHERE i.id_evento = e.id_evento AND i.estado <> 'Cancelado'), 0) AS inscritos,
+         COALESCE((SELECT COUNT(*)::int FROM Inscripcion i WHERE i.id_evento = e.id_evento AND i.estado <> 'Cancelado'), 0) AS inscritos,
          e.estado, e.latitud, e.longitud, e.imagen_url,
          t.nombre AS tipo,
          u.nombre AS organizador,

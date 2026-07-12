@@ -252,6 +252,10 @@ async function actualizar(req, res) {
       }
     }
 
+    if (eventoActual.estado !== 'Próximo') {
+      return res.status(400).json({ message: 'Solo se puede editar un evento mientras está en estado "Próximo"' });
+    }
+
     const resolved = await resolveEventPayload(req, eventoActual);
     if (resolved.error) {
       return res.status(400).json({ message: resolved.error });

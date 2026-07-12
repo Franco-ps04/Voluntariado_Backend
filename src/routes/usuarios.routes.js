@@ -7,6 +7,7 @@ router.get('/', auth, soloRoles('admin'), usuariosController.listar);
 
 // Debe ir antes de /:id
 router.get('/destinatarios-activos', auth, soloRoles('voluntario'), usuariosController.destinatariosActivos);
+router.get('/exportar', auth, soloRoles('admin'), usuariosController.exportar);
 
 router.get('/:id', auth, soloRoles('admin'), usuariosController.obtener);
 router.put('/:id', auth, soloRoles('admin'), usuariosController.actualizar);

@@ -17,7 +17,6 @@ class NotificacionDAO extends BaseDAO {
          CASE WHEN nl.id_notificacion IS NOT NULL THEN 1 ELSE 0 END AS leida
        FROM Notificacion n
        JOIN Evento    e  ON n.id_evento = e.id_evento
-                         AND COALESCE(e.archivado, false) = false
        JOIN Usuario   u  ON n.id_usuario = u.id_usuario
        JOIN Inscripcion i ON i.id_evento  = e.id_evento
                          AND i.id_voluntario = $1

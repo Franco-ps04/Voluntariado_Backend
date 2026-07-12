@@ -77,7 +77,7 @@ class UsuarioDAO extends BaseDAO {
          u.rol, u.activo,
          TO_CHAR(u.creado_en, 'YYYY-MM-DD') AS creado_en,
          o.nombre_organizacion AS organizacion,
-         (SELECT COUNT(*) FROM Inscripcion i
+         (SELECT COUNT(*)::int FROM Inscripcion i
            WHERE i.id_voluntario = u.id_usuario
              AND i.estado = 'Finalizado') AS num_eventos
        FROM Usuario u
