@@ -43,6 +43,32 @@ class EventoDAO extends BaseDAO {
     return rows.map((r) => r.descripcion);
   }
 
+  /**
+   * Trae los requisitos de VARIOS eventos en una sola consulta (evita el
+   * patrón N+1 de llamar findRequisitos() una vez por cada evento listado).
+   * @param {number[]} idEventos
+   * @returns {Promise<Map<number, string[]>>} id_evento -> [descripciones]
+   */
+  async findRequisitosPorEventos(idEventos) {
+    const mapa = new Map();
+    if (!idEventos || idEventos.length === 0) return mapa;
+
+    const { rows } = await query(
+      `SELECT id_evento, descripcion
+       FROM EventoRequisito
+       WHERE id_evento = ANY($1::int[])
+       ORDER BY id_evento ASC, orden ASC, id_requisito ASC`,
+      [idEventos]
+    );
+
+    for (const row of rows) {
+      const lista = mapa.get(row.id_evento) ?? [];
+      lista.push(row.descripcion);
+      mapa.set(row.id_evento, lista);
+    }
+    return mapa;
+  }
+
   async insertarRequisito(idEvento, descripcion, orden) {
     await query(
       `INSERT INTO EventoRequisito (id_evento, descripcion, orden)
