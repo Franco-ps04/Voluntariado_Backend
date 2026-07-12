@@ -145,13 +145,13 @@ async function listar(req, res) {
   try {
     const eventos = await eventoDAO.listar({ tipo: req.query.tipo, estado: req.query.estado });
 
-    const requisitosPorEvento = await eventoDAO.findRequisitosPorEventos(eventos.map(e => e.id_evento));
+    /* const requisitosPorEvento = await eventoDAO.findRequisitosPorEventos(eventos.map(e => e.id_evento));
     const data = await Promise.all(
       eventos.map(ev => sincronizarEstadoAutomatico({
         ...ev,
         requisitos: requisitosPorEvento.get(ev.id_evento) ?? []
       }))
-    );
+    ); */
 
     res.json(data);
   } catch (err) {
@@ -173,13 +173,13 @@ async function listarGestion(req, res) {
 
     const eventos = await eventoDAO.listarGestion({ idOrganizador });
 
-    const requisitosPorEvento = await eventoDAO.findRequisitosPorEventos(eventos.map(e => e.id_evento));
+    /* const requisitosPorEvento = await eventoDAO.findRequisitosPorEventos(eventos.map(e => e.id_evento));
     const data = await Promise.all(
       eventos.map(ev => sincronizarEstadoAutomatico({
         ...ev,
         requisitos: requisitosPorEvento.get(ev.id_evento) ?? []
       }))
-    );
+    ); */
 
     res.json(data);
   } catch (err) {
