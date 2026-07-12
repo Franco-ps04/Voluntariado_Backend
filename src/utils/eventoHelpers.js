@@ -88,8 +88,15 @@ function validateDateTime(fecha, hora) {
   const fechaHora = new Date(`${rawFecha}T${rawHora.length === 5 ? `${rawHora}:00` : rawHora}`);
   if (Number.isNaN(fechaHora.getTime())) return 'Fecha u hora inválida';
 
-  const now = new Date();
-  if (fechaHora.getTime() < now.getTime()) {
+  // Margen de tolerancia: entre que el usuario llena el formulario, hace
+  // clic en "Crear evento", y la petición llega al servidor (que puede
+  // tardar varios segundos, o hasta ~50s si el servicio estaba dormido),
+  // pueden pasar varios minutos. Sin este margen, un evento válido en el
+  // momento de enviarlo podía rechazarse solo por esa demora de red.
+  const MARGEN_TOLERANCIA_MS = 15 * 60 * 1000; // 15 minutos
+  const ahoraConMargen = new Date(Date.now() - MARGEN_TOLERANCIA_MS);
+
+  if (fechaHora.getTime() < ahoraConMargen.getTime()) {
     return 'La fecha y hora no pueden ser anteriores al momento actual';
   }
   return null;
