@@ -140,6 +140,20 @@ class UsuarioDAO extends BaseDAO {
     const { rows } = await query('SELECT rol FROM Usuario WHERE id_usuario = $1', [id]);
     return rows[0]?.rol ?? null;
   }
+
+  async findEstadoYRolById(id) {
+    const { rows } = await query('SELECT rol, activo FROM Usuario WHERE id_usuario = $1', [id]);
+    return rows[0] || null;
+  }
+
+  // Cuántos administradores activos (no suspendidos) hay en el sistema.
+  // Se usa para impedir que una acción deje el sistema sin ningún admin.
+  async contarAdminsActivos() {
+    const { rows } = await query(
+      `SELECT COUNT(*)::int AS total FROM Usuario WHERE rol = 'admin' AND activo = true`
+    );
+    return rows[0]?.total ?? 0;
+  }
 }
 
 module.exports = new UsuarioDAO();

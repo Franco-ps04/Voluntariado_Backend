@@ -87,21 +87,45 @@ async function actualizar(req, res) {
   if (!rolesValidos.includes(rol))
     return res.status(400).json({ message: 'Rol inválido' });
 
+  const idObjetivo = Number(req.params.id);
+  const esPropiaCuenta = idObjetivo === req.usuario.id;
+
   try {
-    const rolAnterior = await usuarioDAO.findRolById(req.params.id);
+    const usuarioObjetivo = await usuarioDAO.findEstadoYRolById(idObjetivo);
+    if (!usuarioObjetivo)
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    const rolAnterior = usuarioObjetivo.rol;
+
+    // Puedes editar tu propio nombre/correo/teléfono desde aquí, pero NO tu
+    // propio rol: si te quitas el rol de admin y eras el único, el sistema
+    // se queda sin nadie que administre.
+    if (esPropiaCuenta && rol !== rolAnterior) {
+      return res.status(403).json({ message: 'No puedes cambiar tu propio rol desde este panel. Pide a otro administrador que lo haga.' });
+    }
+
     const promovido = (rolAnterior === 'voluntario' && (rol === 'admin' || rol === 'organizador'));
 
-    await usuarioDAO.actualizar(req.params.id, { nombre, email, telefono, rol });
+    // Defensa adicional: no permitir degradar al único administrador
+    // activo del sistema (aunque no sea una auto-modificación).
+    if (rolAnterior === 'admin' && rol !== 'admin' && usuarioObjetivo.activo) {
+      const activosAdmins = await usuarioDAO.contarAdminsActivos();
+      if (activosAdmins <= 1) {
+        return res.status(409).json({ message: 'No puedes quitar el rol de administrador al único administrador activo del sistema.' });
+      }
+    }
+
+    await usuarioDAO.actualizar(idObjetivo, { nombre, email, telefono, rol });
 
     if (rol === 'organizador') {
-      await organizadorDAO.upsert(req.params.id, nombre_organizacion);
+      await organizadorDAO.upsert(idObjetivo, nombre_organizacion);
     } else {
-      await organizadorDAO.eliminarPorUsuario(req.params.id);
+      await organizadorDAO.eliminarPorUsuario(idObjetivo);
     }
 
     if (promovido) {
-      await inscripcionDAO.cancelarTodasActivasPorVoluntario(req.params.id);
-      await asistenciaDAO.eliminarPorVoluntario(req.params.id);
+      await inscripcionDAO.cancelarTodasActivasPorVoluntario(idObjetivo);
+      await asistenciaDAO.eliminarPorVoluntario(idObjetivo);
     }
 
     res.json({ ok: true });
@@ -116,15 +140,35 @@ async function cambiarEstado(req, res) {
   if (typeof req.body.activo !== 'boolean')
     return res.status(400).json({ message: 'activo debe ser true o false' });
 
-  try {
-    const rolActual = await usuarioDAO.findRolById(req.params.id);
+  const idObjetivo = Number(req.params.id);
 
-    if (req.body.activo === false && rolActual) {
-      await limpiarDatosUsuarioSuspendido(Number(req.params.id), rolActual);
+  // No puedes suspender (ni reactivar) tu propia cuenta desde este panel:
+  // si te suspendes siendo el único admin, nadie más puede administrar
+  // el sistema.
+  if (idObjetivo === req.usuario.id) {
+    return res.status(403).json({ message: 'No puedes suspender tu propia cuenta desde este panel.' });
+  }
+
+  try {
+    const usuarioObjetivo = await usuarioDAO.findEstadoYRolById(idObjetivo);
+    if (!usuarioObjetivo)
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    // Defensa adicional: no dejar el sistema sin ningún administrador
+    // activo (aunque no sea una auto-suspensión).
+    if (req.body.activo === false && usuarioObjetivo.rol === 'admin' && usuarioObjetivo.activo) {
+      const activosAdmins = await usuarioDAO.contarAdminsActivos();
+      if (activosAdmins <= 1) {
+        return res.status(409).json({ message: 'No puedes suspender al único administrador activo del sistema.' });
+      }
     }
 
-    await usuarioDAO.actualizarEstado(req.params.id, req.body.activo);
+    if (req.body.activo === false) {
+      await limpiarDatosUsuarioSuspendido(idObjetivo, usuarioObjetivo.rol);
+    }
 
+    await usuarioDAO.actualizarEstado(idObjetivo, req.body.activo);
+    
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
